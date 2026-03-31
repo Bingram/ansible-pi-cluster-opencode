@@ -1,0 +1,44 @@
+# BIND9 configuration for load balancer DNS
+# ==========================================
+
+options {
+    // Listen on all interfaces
+    listen-on port 53 { any; };
+    listen-on-v6 port 53 { any; };
+    
+    // Allow queries from the local network
+    allow-query { any; };
+    allow-recursion { 192.168.0.0/16; localhost; };
+    
+    // Disable recursion for external clients (forward-only)
+    recursion no;
+    
+    // DNSSEC validation
+    dnssec-validation auto;
+    
+    // Logging
+    log-channel default { severity info; };
+    logging {
+        channel default { file "/var/log/named/default.log" versions 3 size 5m; };
+        category queries { channel default; };
+        category responses { channel default; };
+    };
+};
+
+// Forwarders configuration
+forwarders {
+    // Pi-hole (if running on same host)
+    if (client == local) {
+        127.0.0.1;
+    }
+    
+    // Upstream DNS servers for failover
+    8.8.8.8;
+    1.1.1.1;
+};
+
+// Zone files
+zone "cluster.local" IN {
+    type master;
+    file "/var/lib/bind/cluster.local.zone";
+};

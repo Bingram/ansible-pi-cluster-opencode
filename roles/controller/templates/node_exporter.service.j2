@@ -1,0 +1,16 @@
+# Node Exporter systemd service
+[Unit]
+Description=Node Exporter for Prometheus Monitoring
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/monitoring/node_exporter
+ExecStart=/opt/monitoring/node_exporter/node_exporter --web.listen-address=:9100
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

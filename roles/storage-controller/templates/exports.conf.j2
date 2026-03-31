@@ -1,0 +1,8 @@
+[defaults]
+# NFS Exports Configuration
+# Edit this file after each change!
+
+{{ shared_data_dir }} {{ nfs_exports[0]['clients'] }} {{ nfs_exports[0]['options'] | join(',') }}
+
+# Additional exports can be added here:
+# /path/to/export client1(client2,...) options

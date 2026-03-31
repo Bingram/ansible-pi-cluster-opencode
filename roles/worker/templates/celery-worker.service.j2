@@ -1,0 +1,22 @@
+# Celery worker systemd service
+[Unit]
+Description=Celery Worker for Job Processing
+After=network.target redis-server.service
+Wants=redis-server.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/job-processing-env
+ExecStart=/opt/job-processing-env/bin/celery \
+  -A cluster_worker:app worker \
+  --loglevel=info \
+  --concurrency={{ celery_worker_concurrency | default(4) }} \
+  --prefetch-multiplier={{ celery_worker_prefetch_multiplier | default(1) }} \
+  --time-limit={{ job_timeout | default(3600) }} \
+  --max-tasks-per-child={{ max_retries | default(3) }}
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

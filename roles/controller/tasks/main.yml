@@ -1,0 +1,181 @@
+# Controller Role - Monitoring Stack Installation
+# ===============================================
+
+- name: Configure monitoring controller
+  hosts: controller
+  become: yes
+  gather_facts: yes
+
+  vars:
+    # Prometheus configuration
+    prometheus_port: 9090
+    prometheus_retention: "15d"
+    
+    # Grafana configuration
+    grafana_port: 3000
+    grafana_admin_user: admin
+    grafana_admin_password: "{{ grafana_admin_password | default('admin') }}"
+    
+    # Node Exporter port
+    node_exporter_port: 9100
+    
+    # Blackbox Exporter configuration
+    blackbox_exporter_port: 9115
+    dns_monitoring_enabled: true
+
+  tasks:
+    # Install Prometheus stack dependencies
+    - name: Install monitoring prerequisites
+      ansible.builtin.apt:
+        name:
+          - curl
+          - wget
+          - gnupg
+          - lsb-release
+          - software-properties-common
+        state: present
+
+    # Set up Prometheus repository and install
+    - name: Add Prometheus GPG key
+      ansible.builtin.apt_key:
+        url: https://packages.redis.io/redis-oss.gpg.key
+        state: present
+
+    - name: Install Prometheus from official repository
+      ansible.builtin.apt:
+        name: prometheus
+        state: present
+
+    # Set up Node Exporter
+    - name: Create Node Exporter directory structure
+      ansible.builtin.file:
+        path: /opt/monitoring/node_exporter
+        state: directory
+        mode: '0755'
+
+    - name: Download and install Node Exporter binary
+      ansible.builtin.geturl:
+        url: "https://github.com/prometheus/node_exporter/releases/download/v1.6.1/node_exporter-{{ ansible_system | lower }}_v1.6.1.tar.gz"
+        dest: /opt/monitoring/node_exporter/node_exporter.tar.gz
+      register: node_exporter_download
+      until: node_exporter_download.status == 200
+      retries: 3
+      delay: 5
+
+    - name: Extract Node Exporter binary
+      ansible.builtin.unarchive:
+        src: /opt/monitoring/node_exporter/node_exporter.tar.gz
+        dest: /opt/monitoring/node_exporter/
+        remote_src: yes
+        creates: /opt/monitoring/node_exporter/node_exporter
+
+    # Set up Grafana
+    - name: Add Grafana APT repository
+      ansible.builtin.apt_repository:
+        repo: "deb https://packages.grafana.com/oss/deb stable"
+        state: present
+
+    - name: Install Grafana
+      ansible.builtin.apt:
+        name: grafana
+        state: present
+
+    # Set up Blackbox Exporter for DNS monitoring
+    - name: Create Blackbox Exporter directory structure
+      ansible.builtin.file:
+        path: /opt/monitoring/blackbox_exporter
+        state: directory
+        mode: '0755'
+
+    - name: Download and install Blackbox Exporter binary
+      ansible.builtin.geturl:
+        url: "https://github.com/prometheus/blackbox_exporter/releases/download/v0.21.0/blackbox_exporter-{{ ansible_system | lower }}_v0.21.0.tar.gz"
+        dest: /opt/monitoring/blackbox_exporter/blackbox_exporter.tar.gz
+      register: blackbox_download
+      until: blackbox_download.status == 200
+      retries: 3
+      delay: 5
+
+    - name: Extract Blackbox Exporter binary
+      ansible.builtin.unarchive:
+        src: /opt/monitoring/blackbox_exporter/blackbox_exporter.tar.gz
+        dest: /opt/monitoring/blackbox_exporter/
+        remote_src: yes
+        creates: /opt/monitoring/blackbox_exporter/blackbox_exporter
+
+    # Configure Prometheus
+    - name: Create Prometheus configuration directory
+      ansible.builtin.file:
+        path: /etc/prometheus
+        state: directory
+        mode: '0755'
+
+    - name: Generate Prometheus configuration
+      ansible.builtin.template:
+        src: prometheus.yml.j2
+        dest: /etc/prometheus/prometheus.yml
+        mode: '0644'
+
+    # Configure Grafana
+    - name: Create Grafana configuration directory
+      ansible.builtin.file:
+        path: /etc/grafana
+        state: directory
+        mode: '0755'
+
+    - name: Generate Grafana systemd service
+      ansible.builtin.template:
+        src: grafana.service.j2
+        dest: /etc/systemd/system/grafana.service
+        mode: '0644'
+
+    # Set up monitoring services
+    - name: Create Prometheus systemd service
+      ansible.builtin.template:
+        src: prometheus.service.j2
+        dest: /etc/systemd/system/prometheus.service
+        mode: '0644'
+
+    - name: Enable and start Prometheus
+      ansible.builtin.systemd:
+        name: prometheus
+        enabled: yes
+        state: started
+
+    - name: Create Grafana systemd service
+      ansible.builtin.template:
+        src: grafana.service.j2
+        dest: /etc/systemd/system/grafana.service
+        mode: '0644'
+
+    - name: Enable and start Grafana
+      ansible.builtin.systemd:
+        name: grafana
+        enabled: yes
+        state: started
+
+    # Set up Node Exporter service
+    - name: Create Node Exporter systemd service
+      ansible.builtin.template:
+        src: node_exporter.service.j2
+        dest: /etc/systemd/system/node_exporter.service
+        mode: '0644'
+
+    - name: Enable and start Node Exporter
+      ansible.builtin.systemd:
+        name: node_exporter
+        enabled: yes
+        state: started
+
+    # Set up Blackbox Exporter service
+    - name: Create Blackbox Exporter systemd service
+      ansible.builtin.template:
+        src: blackbox_exporter.service.j2
+        dest: /etc/systemd/system/blackbox_exporter.service
+        mode: '0644'
+
+    - name: Enable and start Blackbox Exporter
+      ansible.builtin.systemd:
+        name: blackbox_exporter
+        enabled: yes
+        state: started

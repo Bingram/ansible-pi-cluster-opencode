@@ -1,0 +1,24 @@
+# Celery Worker Configuration
+# ============================
+
+broker_url = 'redis://127.0.0.1:6379/0'
+result_backend = 'redis://127.0.0.1:6379/0'
+
+worker_concurrency = {{ celery_worker_concurrency | default(4) }}
+worker_prefetch_multiplier = {{ celery_worker_prefetch_multiplier | default(1) }}
+time_limit = {{ job_timeout | default(3600) }}
+max_tasks_per_child = {{ max_retries | default(3) }}
+
+# Task settings
+task_serializer = 'json'
+result_serializer = 'json'
+accept_content = ['json']
+timeout = 30
+
+# Retry configuration
+default_max_retries = {{ max_retries | default(3) }}
+deadletter_queue_prefix = ''
+
+# Logging
+worker_logcolor = true
+loglevel = 'info'

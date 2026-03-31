@@ -1,0 +1,187 @@
+# Storage Controller Role - Shared NFS Setup
+# ==========================================
+
+- name: Configure shared storage server
+  hosts: storage
+  become: yes
+  gather_facts: yes
+
+  vars:
+    # NFS configuration
+    nfs_export_path: "/data/shared"
+    nfs_root_squash: true
+    nfs_read_only: false
+    nfs_allow_hosts: "192.168.0.0/16"  # Allow entire subnet
+    
+    # ZFS pool (optional, for better performance)
+    zfs_pool_name: "storage-pool"
+    zfs_enabled: true
+    
+    # Backup configuration
+    backup_schedule: "0 2 * * *"  # Daily at 2 AM
+    backup_retention_days: 7
+
+  tasks:
+    # Install NFS server dependencies
+    - name: Install NFS server and utilities
+      ansible.builtin.apt:
+        name:
+          - nfs-kernel-server
+          - nfs-common
+          - python3-pip
+        state: present
+
+    # Set up shared data directory structure
+    - name: Create shared data directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - "/data/shared"
+        - "/data/backup"
+        - "/data/logs"
+        - "/data/cache"
+
+    # Configure NFS exports
+    - name: Create NFS configuration directory
+      ansible.builtin.file:
+        path: /etc/nfs
+        state: directory
+        mode: '0755'
+
+    - name: Generate NFS export configuration
+      ansible.builtin.template:
+        src: nfs.exports.j2
+        dest: /etc/nfs/exports.conf
+        mode: '0644'
+
+    - name: Configure NFS exports
+      community.general.nfs_exports:
+        path: "{{ nfs_export_path }}"
+        access: "{{ nfs_allow_hosts }}"
+        sync: true
+        root_squash: {{ nfs_root_squash | lower }}
+        read_only: {{ nfs_read_only | lower }}
+      when: not zfs_enabled | bool
+
+    # Set up ZFS pool (optional)
+    - name: Configure ZFS storage pool
+      block:
+        - name: Install ZFS utilities
+          ansible.builtin.apt:
+            name: zfsutils-linux
+            state: present
+
+        - name: Create ZFS pool if enabled
+          community.general.zfs_pool:
+            name: "{{ zfs_pool_name }}"
+            state: absent  # Remove existing pool first
+          when: zfs_enabled | bool
+
+        - name: Create ZFS pool (if hardware available)
+          community.general.zfs_pool:
+            name: "{{ zfs_pool_name }}"
+            state: present
+            type: mirror  # Use RAID1 for redundancy
+          when: zfs_enabled | bool and ansible_facts['zfs'] is defined
+
+      when: zfs_enabled | bool
+
+    # Set up automated backup system
+    - name: Create backup configuration directory
+      ansible.builtin.file:
+        path: /etc/backup
+        state: directory
+        mode: '0755'
+
+    - name: Generate backup cron job
+      ansible.builtin.cron:
+        name: "Automated NFS backup"
+        minute: "{{ backup_schedule.split()[0] }}"
+        hour: "{{ backup_schedule.split()[1] }}"
+        user: root
+        job: "/usr/local/bin/backup-nfs.sh >> /var/log/nfs-backup.log 2>&1"
+      when: true  # Enable automated backups by default
+
+    # Set up monitoring for NFS exports
+    - name: Create NFS monitoring script
+      ansible.builtin.copy:
+        content: |
+          #!/bin/bash
+          # NFS Export Monitoring Script
+          
+          export_path="{{ nfs_export_path }}"
+          max_mounts=10
+          warning_threshold=8
+          
+          echo "=== NFS Export Monitor ==="
+          echo "Timestamp: $(date)"
+          echo "Export Path: $export_path"
+          echo ""
+          
+          # Check if export is mounted
+          mount_count=$(mount | grep -c "$export_path")
+          echo "Current mounts: $mount_count / $max_mounts"
+          
+          if [ $mount_count -ge $warning_threshold ]; then
+              echo "[WARN] High number of mounts detected!"
+          fi
+          
+          # Check disk space
+          df -h "$export_path" 2>/dev/null | tail -1 | awk '{print "Disk Usage: " $5}'
+          
+          # Check for stale connections
+          nfsstat -m 2>/dev/null | grep -E "stale|retrans" || echo "No stale connections detected"
+          
+          echo ""
+          echo "=== NFS Monitor Complete ==="
+        dest: /usr/local/bin/monitor-nfs.sh
+        mode: '0755'
+
+    # Set up backup script (optional)
+    - name: Create automated backup script
+      ansible.builtin.copy:
+        content: |
+          #!/bin/bash
+          # Automated NFS Backup Script
+          
+          BACKUP_DIR="/data/backup"
+          RETENTION_DAYS={{ backup_retention_days | default(7) }}
+          SOURCE_PATH="{{ nfs_export_path }}"
+          
+          echo "=== Starting NFS Backup ==="
+          echo "Timestamp: $(date)"
+          echo "Source: $SOURCE_PATH"
+          echo "Backup dir: $BACKUP_DIR"
+          echo "Retention: $RETENTION_DAYS days"
+          echo ""
+          
+          # Create backup directory if it doesn't exist
+          mkdir -p "$BACKUP_DIR"
+          
+          # Perform incremental backup using rsync
+          rsync -av --delete --link-dest="$BACKUP_DIR/latest" \
+            "$SOURCE_PATH/" "$BACKUP_DIR/$(date +%Y%m%d)"
+          
+          # Update latest symlink
+          ln -sf "$BACKUP_DIR/$(date +%Y%m%d)" "$BACKUP_DIR/latest"
+          
+          # Clean up old backups
+          find "$BACKUP_DIR" -mindepth 1 -maxdepth 1 -type d \
+            -mtime +$RETENTION_DAYS -exec rm -rf {} \;
+          
+          echo ""
+          echo "=== Backup Complete ==="
+        dest: /usr/local/bin/backup-nfs.sh
+        mode: '0755'
+
+    # Set up backup cron job
+    - name: Create automated backup cron job
+      ansible.builtin.cron:
+        name: "Automated NFS backup"
+        minute: "{{ backup_schedule.split()[0] }}"
+        hour: "{{ backup_schedule.split()[1] }}"
+        user: root
+        job: "/usr/local/bin/backup-nfs.sh >> /var/log/nfs-backup.log 2>&1"
+      when: true  # Enable automated backups by default

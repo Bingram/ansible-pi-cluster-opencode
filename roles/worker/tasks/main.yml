@@ -1,0 +1,117 @@
+# Worker Role - Job Processing Setup
+# ===================================
+
+- name: Configure job processing workers
+  hosts: workers
+  become: yes
+  gather_facts: yes
+
+  vars:
+    # Redis configuration for job queue
+    redis_password: "{{ redis_password | default('cluster_queue') }}"
+    redis_max_memory: "256mb"
+    
+    # Celery worker settings
+    celery_worker_concurrency: 4
+    celery_worker_prefetch_multiplier: 1
+    
+    # Job processing settings
+    job_timeout: 3600  # 1 hour default timeout
+    max_retries: 3
+
+  tasks:
+    # Install Redis for job queue management
+    - name: Install Redis server
+      ansible.builtin.apt:
+        name:
+          - redis-server
+          - python3-pip
+        state: present
+
+    # Configure Redis with cluster-specific settings
+    - name: Create Redis configuration directory
+      ansible.builtin.file:
+        path: /etc/redis
+        state: directory
+        mode: '0755'
+
+    - name: Generate Redis configuration
+      ansible.builtin.template:
+        src: redis.conf.j2
+        dest: /etc/redis/redis-cluster.conf
+        mode: '0644'
+
+    - name: Start and enable Redis server
+      ansible.builtin.systemd:
+        name: redis-server
+        enabled: yes
+        state: started
+
+    # Install Python dependencies for job processing
+    - name: Create virtual environment for job processing
+      ansible.builtin.venv:
+        path: /opt/job-processing-env
+        interpreter: python3
+
+    - name: Install job processing dependencies
+      ansible.builtin.pip:
+        virtualenv: /opt/job-processing-env
+        requirements: |
+          celery>=5.2.0
+          redis>=4.3.0
+          kombu>=5.2.0
+          flower>=1.0.0  # Web-based Celery monitoring
+        executable: /opt/job-processing-env/bin/pip
+
+    # Set up Celery worker configuration
+    - name: Create Celery worker directory structure
+      ansible.builtin.file:
+        path: /etc/celery
+        state: directory
+        mode: '0755'
+
+    - name: Generate Celery worker configuration
+      ansible.builtin.template:
+        src: celery-worker.conf.j2
+        dest: /etc/celery/worker-cluster.conf
+        mode: '0644'
+
+    # Set up Flower for monitoring (optional)
+    - name: Create Flower directory structure
+      ansible.builtin.file:
+        path: /opt/job-processing-env/flower
+        state: directory
+        mode: '0755'
+
+    - name: Generate Flower systemd service
+      ansible.builtin.template:
+        src: flower.service.j2
+        dest: /etc/systemd/system/flower.service
+        mode: '0644'
+
+    # Set up job processing services
+    - name: Create Celery worker systemd service
+      ansible.builtin.template:
+        src: celery-worker.service.j2
+        dest: /etc/systemd/system/celery-worker.service
+        mode: '0644'
+
+    - name: Enable and start Celery worker
+      ansible.builtin.systemd:
+        name: celery-worker
+        enabled: yes
+        state: started
+
+    # Set up Flower monitoring service (optional)
+    - name: Create Flower systemd service
+      ansible.builtin.template:
+        src: flower.service.j2
+        dest: /etc/systemd/system/flower.service
+        mode: '0644'
+
+    - name: Enable and start Flower (if enabled)
+      ansible.builtin.systemd:
+        name: flower
+        enabled: yes
+        state: started
+      when: celery_flower_enabled | default(true)

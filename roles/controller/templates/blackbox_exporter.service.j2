@@ -1,0 +1,16 @@
+# Blackbox Exporter systemd service
+[Unit]
+Description=Blackbox Exporter for DNS Monitoring
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/monitoring/blackbox_exporter
+ExecStart=/opt/monitoring/blackbox_exporter/blackbox_exporter --web.listen-address=:9115
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

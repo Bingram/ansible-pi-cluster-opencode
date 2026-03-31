@@ -1,0 +1,19 @@
+# BIND9 zone file for cluster.local
+# =================================
+$TTL 86400
+@       IN      SOA     ns1.cluster.local. admin.cluster.local. (
+                        2024033101 ; Serial
+                        3600        ; Refresh
+                        1800        ; Retry
+                        604800     ; Expire
+                        86400 )     ; Minimum TTL
+
+; Name servers
+@       IN      NS      ns1.cluster.local.
+ns1     IN      A       {{ loadbalancer_ip | default('192.168.1.5') }}
+
+; A records
+@       IN      A       {{ loadbalancer_ip | default('192.168.1.5') }}
+controller    IN      A       {{ controller_ip | default('192.168.1.10') }}
+storage       IN      A       {{ storage_controller_ip | default('192.168.1.20') }}
+pihole        IN      A       {{ pihole_ip | default('192.168.1.30') }}

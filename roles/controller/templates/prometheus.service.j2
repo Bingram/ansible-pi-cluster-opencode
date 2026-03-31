@@ -1,0 +1,20 @@
+# Prometheus systemd service
+[Unit]
+Description=Prometheus Monitoring System
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/monitoring/prometheus
+ExecStart=/opt/monitoring/prometheus/prometheus \
+  --config.file=/etc/prometheus/prometheus.yml \
+  --storage.tsdb.path=/var/lib/prometheus/data \
+  --web.listen-address=:9090 \
+  --web.enable-lifecycle
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

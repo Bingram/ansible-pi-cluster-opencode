@@ -1,0 +1,16 @@
+[Unit]
+Description=BIND9 DNS Server
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/etc/bind
+ExecStart=/usr/sbin/named -c /etc/bind/named.conf.options \
+  -u named
+Restart=on-failure
+RestartSec=5s
+LimitNOFILE=1048576
+
+[Install]
+WantedBy=multi-user.target

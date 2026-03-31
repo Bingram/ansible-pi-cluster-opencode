@@ -1,0 +1,5 @@
+# NFS Exports Configuration
+# ==========================
+
+{{ nfs_export_path | default('/data/shared') }} {{ nfs_allow_hosts | default('192.168.0.0/16') }}
+  sync,no_subtree_check,{{ 'no_root_squash' if not nfs_root_squash else 'root_squash' }},{{ 'rw' if not nfs_read_only else 'ro'}}

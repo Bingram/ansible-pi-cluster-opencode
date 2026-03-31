@@ -1,0 +1,14 @@
+[Unit]
+Description=Failover Monitor Service
+After=network.target bind9.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/dns/failover
+ExecStart=/opt/dns/failover/monitor_failover.sh
+Restart=on-failure
+RestartSec={{ failover_check_interval }}s
+
+[Install]
+WantedBy=multi-user.target

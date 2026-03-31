@@ -1,0 +1,21 @@
+---
+# BIND9 Forwarders Configuration
+# Forward queries to Pi-hole (if on same host) and upstream DNS servers
+
+# Forward queries to Pi-hole if running locally or on different host
+{% if pihole_ip != '127.0.0.1' %}
+forward {
+    {{ pihole_ip }};
+};
+{% endif %}
+
+# Fallback upstream DNS servers (Google, Cloudflare, OpenDNS)
+forwarders {
+    8.8.8.8;
+    8.8.4.4;
+    1.1.1.1;
+    1.0.0.1;
+};
+
+# Note: If Pi-hole is on the same host, it will be used as primary forwarder.
+# Otherwise, queries go directly to upstream servers.

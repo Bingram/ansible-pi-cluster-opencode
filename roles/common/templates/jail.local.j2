@@ -1,0 +1,22 @@
+[DEFAULT]
+# Fail2Ban jail defaults
+bantime = 3600m              # Ban for 1 hour by default
+findtime = 600m             # Look back 1 hour for violations
+maxretry = 5                # Allow 5 failed attempts before ban
+
+[sshd]
+enabled = true
+port = {{ ssh_port }}
+filter = sshd
+logpath = /var/log/auth.log
+maxretry = 3
+bantime = 1h
+
+[sshd-ddos]
+enabled = true
+port = {{ ssh_port }}
+filter = sshd-ddos
+logpath = /var/log/auth.log
+maxretry = 60
+findtime = 10m
+bantime = 1d

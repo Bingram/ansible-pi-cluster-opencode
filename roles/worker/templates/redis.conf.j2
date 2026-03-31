@@ -1,0 +1,33 @@
+# Redis configuration for job queue
+# =================================
+
+# Network
+bind 127.0.0.1
+protected-mode yes
+port 6379
+tcp-backlog 511
+timeout 0
+tcp-keepalive 300
+pidfile /var/run/redis/redis-server.pid
+loglevel notice
+databases 16
+
+# Snapshotting
+save ""  # Disable RDB snapshots for performance
+
+# Replication
+replica-read-only yes
+repl-diskless-sync no
+repl-disable-tcp-nodelay yes
+repl-ping-replica-period 10
+repl-timeout 60
+repl-connect-retries 3
+repl-backlog-size 1mb
+repl-backlog-first-byte-offset 0
+
+# Security
+requirepass "{{ redis_password | default('cluster_queue') }}"
+
+# Memory management
+maxmemory {{ redis_max_memory | default('256mb') }}
+maxmemory-policy allkeys-lru

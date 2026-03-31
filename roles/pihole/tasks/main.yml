@@ -1,0 +1,346 @@
+---
+# Pi-hole Role - Network-wide ad blocker and DNS server
+# Installs and configures Pi-hole on designated Raspberry Pi
+
+- name: Configure Pi-hole
+  hosts: pihole
+  become: yes
+  gather_facts: yes
+
+  vars:
+    # Pi-hole configuration
+    pihole_web_port: 80
+    pihole_api_port: 81
+    pihole_dns_port: 53
+    
+    # Pi-hole settings
+    pihole_password: "{{ lookup('password', '/dev/null length=12 chars=ascii_letters,digits') }}"
+    pihole_webserver: nginx
+    pihole_api_enabled: true
+    pihole_logging: true
+    
+    # DNS configuration
+    primary_dns_server: "{{ loadbalancer_ip }}"  # Points to load balancer
+    secondary_dns_servers:
+      - "8.8.8.8"
+      - "1.1.1.1"
+      - "208.67.222.222"
+    
+    # Pi-hole settings
+    pihole_block_ads: true
+    pihole_block_tracking: true
+    pihole_dnssec: false  # Enable after initial setup
+    pihole_logging_level: "info"
+    
+    # Controller and storage IPs for reference
+    controller_ip: "192.168.1.10"
+    storage_controller_ip: "192.168.1.20"
+    loadbalancer_ip: "192.168.1.5"
+
+  tasks:
+    # Install prerequisites
+    - name: Install Pi-hole prerequisites
+      ansible.builtin.apt:
+        name:
+          - curl
+          - wget
+          - git
+          - php-fpm
+          - php-mysql
+          - php-xml
+          - php-curl
+          - php-gd
+          - php-json
+          - php-intl
+          - php-mbstring
+          - php-zip
+          - nginx
+          - sqlite3
+          - python3-pip
+        state: present
+
+    # Install Pi-hole using official installer script
+    - name: Download and run Pi-hole installer
+      ansible.builtin.geturl:
+        url: "https://install.pi-hole.net"
+        dest: /tmp/pihole-installer.sh
+        owner: root
+        group: root
+        mode: '0755'
+      register: pihole_download
+      until: pihole_download.status == 200
+      retries: 3
+      delay: 5
+
+    - name: Run Pi-hole installer (non-interactive)
+      ansible.builtin.shell: |
+        bash /tmp/pihole-installer.sh <<EOF
+        yes
+        {{ loadbalancer_ip }}
+        {{ pihole_dns_port }}
+        {{ pihole_web_port }}
+        {{ pihole_api_port }}
+        {{ pihole_password }}
+        {{ pihole_webserver }}
+        {{ pihole_api_enabled | lower }}
+        {{ pihole_logging | lower }}
+        {{ pihole_block_ads | lower }}
+        {{ pihole_block_tracking | lower }}
+        {{ pihole_dnssec | lower }}
+        {{ pihole_logging_level }}
+EOF
+      register: pihole_install_result
+      changed_when: true  # Always update Pi-hole configuration
+
+    # Configure custom DNS settings
+    - name: Configure Pi-hole to use load balancer as primary DNS
+      ansible.builtin.lineinfile:
+        path: /etc/pihole/setupVars.conf
+        regexp: '^PIHOLE_DNS1=' 
+        line: "PIHOLE_DNS1={{ primary_dns_server | default('8.8.8.8') }}"
+        backup: yes
+
+    - name: Add secondary DNS servers to Pi-hole
+      ansible.builtin.lineinfile:
+        path: /etc/pihole/setupVars.conf
+        regexp: '^PIHOLE_DNS2=' 
+        line: "PIHOLE_DNS2={{ secondary_dns_servers[0] | default('8.8.4.4') }}"
+        backup: yes
+      when: secondary_dns_servers is defined
+
+    # Configure Pi-hole web interface access
+    - name: Restrict Pi-hole web interface to local network
+      ansible.builtin.lineinfile:
+        path: /etc/nginx/sites-enabled/default
+        regexp: '^#?allow' 
+        line: 'allow 192.168.0.0/24;'
+        backup: yes
+      when: true  # Restrict access by default
+
+    - name: Enable Pi-hole API for remote management
+      ansible.builtin.lineinfile:
+        path: /etc/pihole/setupVars.conf
+        regexp: '^WEBUI_API_ENABLED=' 
+        line: "WEBUI_API_ENABLED=1"
+        backup: yes
+      when: pihole_api_enabled | bool
+
+    # Configure Pi-hole logging
+    - name: Set up Pi-hole log rotation
+      ansible.builtin.copy:
+        content: |
+          /var/log/pihole.log {
+              daily
+              rotate 14
+              compress
+              delaycompress
+              missingok
+              notifempty
+              create 0640 root adm
+          }
+        dest: /etc/logrotate.d/pihole
+        mode: '0644'
+      when: pihole_logging | bool
+
+    # Set up Pi-hole statistics and reporting
+    - name: Install Pi-hole statistics tools
+      ansible.builtin.apt:
+        name:
+          - php-json
+          - php-simplexml
+        state: present
+      when: true  # Enable statistics by default
+
+    # Configure Pi-hole for DNSSEC (after initial setup)
+    - name: Prepare for DNSSEC enablement
+      ansible.builtin.lineinfile:
+        path: /etc/pihole/setupVars.conf
+        regexp: '^DNSSEC=' 
+        line: "DNSSEC=0"
+        backup: yes
+      when: not pihole_dnssec | bool  # Keep disabled by default for stability
+
+    # Set up Pi-hole failover DNS
+    - name: Configure failover DNS servers
+      ansible.builtin.lineinfile:
+        path: /etc/pihole/setupVars.conf
+        regexp: '^FOLLOW_A=' 
+        line: "FOLLOW_A=1"
+        backup: yes
+      when: true  # Enable follow A records by default
+
+    # Create Pi-hole management scripts
+    - name: Create Pi-hole management utilities
+      block:
+        - name: Create Pi-hole status check script
+          ansible.builtin.copy:
+            content: |
+              #!/bin/bash
+              # Pi-hole Status Check Script
+              
+              PIHOLE_IP="{{ inventory_hostname }}"
+              WEB_PORT=80
+              API_PORT=81
+              
+              echo "=== Pi-hole Status ==="
+              echo "Timestamp: $(date)"
+              echo ""
+              
+              # Check if Pi-hole is responding to DNS queries
+              if dig @"$PIHOLE_IP" -p 53 google.com > /dev/null 2>&1; then
+                  echo "[OK] Pi-hole DNS server: $PIHOLE_IP (port 53)"
+              else
+                  echo "[FAIL] Pi-hole DNS server not responding"
+                  exit 1
+              fi
+              
+              # Check web interface
+              if curl -s --connect-timeout 2 "http://$PIHOLE_IP:$WEB_PORT" > /dev/null 2>&1; then
+                  echo "[OK] Pi-hole Web Interface: $PIHOLE_IP:$WEB_PORT"
+              else
+                  echo "[WARN] Pi-hole Web Interface not responding on port $WEB_PORT"
+              fi
+              
+              # Check API endpoint
+              if curl -s --connect-timeout 2 "http://$PIHOLE_IP:$API_PORT/api/adminlight/json" > /dev/null 2>&1; then
+                  echo "[OK] Pi-hole API: $PIHOLE_IP:$API_PORT"
+              else
+                  echo "[WARN] Pi-hole API not responding on port $API_PORT"
+              fi
+              
+              # Get basic statistics if available
+              STATS=$(curl -s --connect-timeout 2 "http://$PIHOLE_IP:$WEB_PORT/admin/api.php?summaryRaw" 2>/dev/null)
+              if [ $? -eq 0 ]; then
+                  echo ""
+                  echo "=== Basic Statistics ==="
+                  echo "$STATS"
+              fi
+              
+              echo ""
+              echo "=== Status Check Complete ==="
+            dest: /opt/pihole/check_status.sh
+            mode: '0755'
+
+        - name: Create Pi-hole log analyzer script
+          ansible.builtin.copy:
+            content: |
+              #!/bin/bash
+              # Pi-hole Log Analyzer Script
+              
+              LOG_FILE="/var/log/pihole.log"
+              OUTPUT_DIR="/opt/pihole/reports"
+              
+              mkdir -p "$OUTPUT_DIR"
+              
+              if [ ! -f "$LOG_FILE" ]; then
+                  echo "No log file found at $LOG_FILE"
+                  exit 0
+              fi
+              
+              # Generate daily report
+              DATE=$(date +%Y-%m-%d)
+              REPORT="$OUTPUT_DIR/pihole-report-$DATE.txt"
+              
+              {
+                  echo "=== Pi-hole Log Report for $(date) ==="
+                  echo "Generated: $(date)"
+                  echo ""
+                  
+                  # Summary statistics
+                  echo "--- Summary ---"
+                  grep -c "^\[" "$LOG_FILE" | xargs -I {} echo "Total log entries: {}"
+                  
+                  # DNS queries
+                  echo ""
+                  echo "--- DNS Queries ---"
+                  grep -c "query:" "$LOG_FILE" 2>/dev/null | xargs -I {} echo "DNS queries processed: {}"
+                  
+                  # Blocked domains
+                  echo ""
+                  echo "--- Blocked Domains ---"
+                  grep -c "blocked:" "$LOG_FILE" 2>/dev/null | xargs -I {} echo "Blocked domains: {}"
+                  
+                  # Ad categories blocked
+                  echo ""
+                  echo "--- Ad Categories ---"
+                  for category in ads tracking malware; do
+                      COUNT=$(grep -c "$category" "$LOG_FILE" 2>/dev/null || echo 0)
+                      echo "$category: $COUNT"
+                  done
+                  
+                  # Errors and warnings
+                  echo ""
+                  echo "--- Errors ---"
+                  grep -i "error\|fail" "$LOG_FILE" 2>/dev/null | tail -20
+                  
+                  echo ""
+                  echo "=== Report Complete ==="
+              } > "$REPORT"
+              
+              echo "Report saved to: $REPORT"
+            dest: /opt/pihole/analyze_logs.sh
+            mode: '0755'
+
+        - name: Create Pi-hole backup script
+          ansible.builtin.copy:
+            content: |
+              #!/bin/bash
+              # Pi-hole Backup Script
+              
+              BACKUP_DIR="/opt/pihole/backups"
+              DATE=$(date +%Y%m%d_%H%M%S)
+              
+              mkdir -p "$BACKUP_DIR"
+              
+              # Export database
+              sqlite3 /etc/pihole/pihole-FTL.db <<EOF > "${BACKUP_DIR}/pihole-database-$DATE.sql"
+.headers on
+.mode column
+SELECT * FROM adlists;
+SELECT * FROM domains;
+SELECT * FROM queries;
+SELECT * FROM clients;
+SELECT * FROM gravity;  -- This may be large, skip if needed
+EOF
+              
+              # Export configuration
+              cp /etc/pihole/setupVars.conf "${BACKUP_DIR}/setupvars-$DATE"
+              cp /etc/pihole/gravity.list "${BACKUP_DIR}/gravity-$DATE" 2>/dev/null || true
+              
+              # Compress backup
+              tar -czf "${BACKUP_DIR}/pihole-backup-${DATE}.tar.gz" \
+                  "${BACKUP_DIR}/pihole-database-*" \
+                  "${BACKUP_DIR}/setupvars-*" \
+                  "${BACKUP_DIR}/gravity-*"
+              
+              echo "Backup created: ${BACKUP_DIR}/pihole-backup-${DATE}.tar.gz"
+            dest: /opt/pihole/backup.sh
+            mode: '0755'
+
+      when: true  # Enable management scripts by default
+
+    # Set up automated Pi-hole maintenance
+    - name: Configure Pi-hole maintenance tasks
+      block:
+        - name: Install cron for scheduled tasks
+          ansible.builtin.apt:
+            name: cron
+            state: present
+
+        - name: Create daily backup cron job
+          ansible.builtin.cron:
+            name: "Pi-hole daily backup"
+            hour: "3"
+            minute: "0"
+            job: "/opt/pihole/backup.sh >> /var/log/pihole-backup.log 2>&1"
+            user: root
+
+        - name: Create log rotation cron job
+          ansible.builtin.cron:
+            name: "Pi-hole log analysis"
+            hour: "4"
+            minute: "0"
+            job: "/opt/pihole/analyze_logs.sh >> /var/log/pihole-analysis.log 2>&1"
+            user: root
+
+      when: true  # Enable maintenance by default

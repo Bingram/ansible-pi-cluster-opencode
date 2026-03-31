@@ -1,0 +1,193 @@
+# Load Balancer Role - DNS + Pi-hole Integration
+# ===============================================
+
+- name: Configure DNS load balancer with Pi-hole
+  hosts: loadbalancer
+  become: yes
+  gather_facts: yes
+
+  vars:
+    # Network configuration
+    cluster_name: "Raspberry-Pi-Cluster"
+    controller_ip: "192.168.1.10"
+    storage_controller_ip: "192.168.1.20"
+    pihole_ip: "192.168.1.30"
+    loadbalancer_ip: "192.168.1.5"
+    
+    # DNS configuration
+    dns_port: 53
+    dns_tls_port: 853
+    failover_enabled: true
+    max_failover_retries: 3
+    failover_delay_seconds: 2
+    
+    # Pi-hole integration
+    pihole_api_port: 81
+    pihole_health_check_interval: 60
+    
+    # HTTPS termination (optional)
+    https_enabled: true
+    certbot_enabled: true
+
+  tasks:
+    # Install DNS server and dependencies
+    - name: Install BIND9 DNS server
+      ansible.builtin.apt:
+        name:
+          - bind9
+          - bind9-host
+          - python3-pip
+        state: present
+
+    # Configure BIND9 for load balancing
+    - name: Create BIND9 configuration directory
+      ansible.builtin.file:
+        path: /etc/bind
+        state: directory
+        mode: '0755'
+
+    - name: Generate BIND9 configuration
+      ansible.builtin.template:
+        src: bind9.conf.j2
+        dest: /etc/bind/named.conf.cluster
+        mode: '0644'
+
+    # Set up Pi-hole integration
+    - name: Install Pi-hole dependencies
+      ansible.builtin.apt:
+        name:
+          - curl
+          - jq
+          - python3-requests
+        state: present
+
+    - name: Create Pi-hole health check script directory
+      ansible.builtin.file:
+        path: /opt/dns/health
+        state: directory
+        mode: '0755'
+
+    - name: Download and configure health monitoring script
+      block:
+        - name: Create custom health check script
+          ansible.builtin.copy:
+            content: |
+              #!/bin/bash
+              # DNS Load Balancer Health Check Script
+              
+              LB_IP="{{ loadbalancer_ip }}"
+              PIHOLE_API_PORT=81
+              MAX_RETRIES=3
+              RETRY_DELAY=2
+              
+              check_dns_response() {
+                  local retries=0
+                  while [ $retries -lt $MAX_RETRIES ]; do
+                      if dig @"$LB_IP" -p 53 google.com > /dev/null 2>&1; then
+                          return 0
+                      fi
+                      retries=$((retries + 1))
+                      sleep $RETRY_DELAY
+                  done
+                  return 1
+              }
+              
+              check_pihole_api() {
+                  if curl -s --connect-timeout 2 "http://$LB_IP:$PIHOLE_API_PORT/api/adminlight/json" > /dev/null 2>&1; then
+                      return 0
+                  fi
+                  return 1
+              }
+              
+              echo "=== DNS Load Balancer Health Check ==="
+              echo "Timestamp: $(date)"
+              echo ""
+              
+              # Check DNS resolution
+              if check_dns_response; then
+                  echo "[OK] DNS Resolution: $LB_IP (port 53)"
+              else
+                  echo "[FAIL] DNS Resolution failed for $LB_IP"
+                  exit 1
+              fi
+              
+              # Check Pi-hole API
+              if check_pihole_api; then
+                  echo "[OK] Pi-hole API: $LB_IP:$PIHOLE_API_PORT"
+              else
+                  echo "[WARN] Pi-hole API not responding on port $PIHOLE_API_PORT"
+              fi
+              
+              # Check system resources
+              CPU_LOAD=$(cat /proc/loadavg | awk '{print $1}')
+              MEM_USAGE=$(free -m | grep Mem | awk '{printf "%.0f", $3/$2 * 100}')
+              echo ""
+              echo "System Resources:"
+              echo "CPU Load: $CPU_LOAD"
+              echo "Memory Usage: ${MEM_USAGE}%"
+              
+              if [ $(echo "$CPU_LOAD > 5" | bc -l) -eq 1 ]; then
+                  echo "[WARN] High CPU load detected!"
+              fi
+              
+              if [ $MEM_USAGE -gt 90 ]; then
+                  echo "[WARN] High memory usage detected!"
+              fi
+              
+              echo ""
+              echo "=== Health Check Complete ==="
+            dest: /opt/dns/health/check_health.sh
+            mode: '0755'
+
+        - name: Create systemd service for health monitoring
+          ansible.builtin.template:
+            src: health-monitor.service.j2
+            dest: /etc/systemd/system/health-monitor.service
+            mode: '0644'
+
+      when: failover_enabled | bool
+
+    # Set up DNS forwarding configuration
+    - name: Configure DNS forwarding to Pi-hole and upstream servers
+      block:
+        - name: Create forwarders configuration
+          ansible.builtin.copy:
+            content: |
+              # Forward queries to Pi-hole (if running on same host)
+              if [ "{{ pihole_ip }}" != "127.0.0.1" ]; then
+                  forward {
+                      {{ pihole_ip }};
+                  }
+              fi
+              
+              # Upstream DNS servers for failover
+              forwarders {
+                    8.8.8.8;
+                    1.1.1.1;
+                };
+            dest: /etc/bind/named.conf.forwarders
+            mode: '0644'
+
+        - name: Create zone file for cluster.local domain
+          ansible.builtin.template:
+            src: cluster.zone.j2
+            dest: /var/lib/bind/cluster.local.zone
+            mode: '0644'
+
+      when: true  # Enable DNS forwarding by default
+
+    # Set up HTTPS termination (optional)
+    - name: Configure HTTPS termination with self-signed certificate
+      block:
+        - name: Install certbot for SSL certificates
+          ansible.builtin.apt:
+            name: certbot
+            state: present
+
+        - name: Create HTTPS configuration directory
+          ansible.builtin.file:
+            path: /etc/ssl/lb-certs
+            state: directory
+            mode: '0755'
+
+      when: true  # Enable HTTPS by default

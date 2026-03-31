@@ -1,0 +1,16 @@
+# Health Monitor systemd service
+[Unit]
+Description=DNS Load Balancer Health Monitoring
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/dns/health
+ExecStart=/opt/dns/health/check_health.sh
+Restart=on-failure
+RestartSec=30s
+
+[Install]
+WantedBy=multi-user.target

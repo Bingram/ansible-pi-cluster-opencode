@@ -1,0 +1,37 @@
+---
+# BIND9 Configuration - Recursive Resolver & Forwarder
+
+options {
+    directory "/etc/bind";
+    pid-file "/var/run/named/named.pid";
+    
+    # Listen on all interfaces, port 53 (DNS)
+    listen-on port 53 { any; };
+    listen-on-v6 port 53 { any; };
+    
+    # Allow queries from local network and trusted sources
+    allow-query { localhost; 192.168.0.0/16; };
+    recursion yes;
+    
+    # Disable DNSSEC validation by default (enable after initial setup)
+    dnssec-validation no;
+    
+    # Forward queries to upstream servers
+    include "/etc/bind/named.conf.forwarders";
+    
+    # Logging configuration
+    logging {
+        channel default_debug {
+            file "data/named-default-debug.log" versions 3 size 5M;
+            severity debug;
+        };
+        channel default_info {
+            file "data/named-default-info.log" versions 3 size 10M;
+            severity info;
+        };
+        category queries { default_info; };
+        category resolver { default_info; };
+    };
+};
+
+# Zone files are in /etc/bind/db.*

@@ -1,0 +1,19 @@
+# Flower monitoring systemd service
+[Unit]
+Description=Flower - Celery Web Monitoring
+After=network.target redis-server.service
+Wants=redis-server.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/job-processing-env/flower
+ExecStart=/opt/job-processing-env/bin/python /opt/job-processing-env/bin/flower \
+  --broker="redis://127.0.0.1:6379" \
+  --port=5555 \
+  --address=0.0.0.0
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

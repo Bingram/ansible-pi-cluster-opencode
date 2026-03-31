@@ -1,0 +1,150 @@
+# Common Role - Base Configuration for All Nodes
+# ==============================================
+
+- name: Configure common settings
+  hosts: all
+  become: yes
+  gather_facts: yes
+
+  vars:
+    # Network configuration
+    cluster_name: "Raspberry-Pi-Cluster"
+    controller_ip: "192.168.1.10"
+    storage_controller_ip: "192.168.1.20"
+    pihole_ip: "192.168.1.30"
+    loadbalancer_ip: "192.168.1.5"
+    
+    # SSH configuration
+    ssh_port: 22
+    ssh_password_auth: false
+    ssh_permit_root_login: no
+    
+    # Firewall settings
+    ufw_default_policy: deny
+    ufw_ssh_allowed: true
+    
+    # System settings
+    hostname_suffix: "{{ ansible_hostname }}"
+    timezone: "Europe/London"  # Adjust for your location
+
+  tasks:
+    # Set hostname and update /etc/hosts
+    - name: Configure hostname
+      block:
+        - name: Get current hostname
+          ansible.builtin.command: hostnamectl --static
+          register: current_hostname
+          changed_when: false
+
+        - name: Set new hostname if different
+          ansible.builtin.hostname:
+            name: "{{ cluster_name }}-{{ hostname_suffix }}"
+          when: current_hostname.stdout != cluster_name + '-' + hostname_suffix
+
+        - name: Update /etc/hosts with controller IP
+          ansible.builtin.lineinfile:
+            path: /etc/hosts
+            line: "192.168.1.10 {{ controller_ip }} controller.cluster.local"
+            state: present
+
+      when: true  # Always configure hostname
+
+    # Install and configure SSH server
+    - name: Configure SSH server
+      block:
+        - name: Ensure OpenSSH is installed
+          ansible.builtin.apt:
+            name: openssh-server
+            state: present
+
+        - name: Configure SSH daemon settings
+          ansible.builtin.template:
+            src: sshd.conf.j2
+            dest: /etc/ssh/sshd_config.d/50-cluster.conf
+            mode: '0644'
+
+        - name: Restart SSH service after configuration
+          ansible.builtin.systemd:
+            name: ssh
+            state: restarted
+
+      when: true  # Always configure SSH
+
+    # Configure firewall with UFW
+    - name: Configure UFW firewall
+      block:
+        - name: Install UFW
+          ansible.builtin.apt:
+            name: ufw
+            state: present
+
+        - name: Set default policies
+          community.general.ufw:
+            default_policy: "{{ ufw_default_policy }}"
+            logging_on: true
+
+        - name: Allow SSH through firewall
+          community.general.ufw:
+            rule: allow
+            port: "{{ ssh_port }}/tcp"
+            description: "SSH access"
+
+      when: true  # Always configure firewall
+
+    # Install monitoring agents (Node Exporter)
+    - name: Install Node Exporter for Prometheus
+      block:
+        - name: Create Node Exporter directory
+          ansible.builtin.file:
+            path: /opt/monitoring/node_exporter
+            state: directory
+            mode: '0755'
+
+        - name: Download Node Exporter binary
+          ansible.builtin.geturl:
+            url: "https://github.com/prometheus/node_exporter/releases/download/v1.6.1/node_exporter-{{ ansible_system | lower }}_v1.6.1.tar.gz"
+            dest: /opt/monitoring/node_exporter/node_exporter.tar.gz
+          register: node_exporter_download
+          until: node_exporter_download.status == 200
+          retries: 3
+          delay: 5
+
+        - name: Extract Node Exporter binary
+          ansible.builtin.unarchive:
+            src: /opt/monitoring/node_exporter/node_exporter.tar.gz
+            dest: /opt/monitoring/node_exporter/
+            remote_src: yes
+            creates: /opt/monitoring/node_exporter/node_exporter
+
+        - name: Create Node Exporter systemd service
+          ansible.builtin.template:
+            src: node_exporter.service.j2
+            dest: /etc/systemd/system/node_exporter.service
+            mode: '0644'
+
+        - name: Enable and start Node Exporter
+          ansible.builtin.systemd:
+            name: node_exporter
+            enabled: yes
+            state: started
+
+      when: true  # Install monitoring agents by default
+
+    # Set up system logging for cluster management
+    - name: Configure centralized logging
+      block:
+        - name: Create log directory structure
+          ansible.builtin.file:
+            path: /var/log/cluster
+            state: directory
+            mode: '0755'
+
+        - name: Set up rsyslog for cluster logging
+          community.general.rsyslog:
+            config: |
+              # Forward all logs to controller
+              *.* @{{ controller_ip }}
+            dest: /etc/rsyslog.d/cluster.conf
+            state: present
+
+      when: true  # Configure logging by default

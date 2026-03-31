@@ -1,0 +1,16 @@
+# SSH daemon configuration for cluster
+# ====================================
+
+# Cluster-specific settings
+Match User root
+    PermitRootLogin prohibit-password
+
+# Disable password authentication (use keys only)
+PasswordAuthentication {{ ssh_password_auth | lower }}
+
+# Additional security hardening
+X11Forwarding no
+AllowTcpForwarding no
+PermitTunnel no
+ClientAliveInterval 300
+ClientAliveCountMax 2

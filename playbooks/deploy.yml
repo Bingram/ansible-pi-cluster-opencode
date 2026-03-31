@@ -1,0 +1,69 @@
+#!/usr/bin/env ansible-playbook
+# Main deployment playbook for 4-Pi cluster
+# Usage: ansible-playbook deploy.yml --inventory inventory.ini
+
+---
+- name: Raspberry Pi Cluster Deployment (4 Nodes)
+  hosts: all
+  become: yes
+  gather_facts: yes
+
+  vars:
+    # === NETWORK CONFIGURATION - UPDATE THESE IPs ===
+    cluster_domain: "cluster.local"
+    controller_ip: "192.168.1.10"      # Controller (also monitoring hub)
+    storage_controller_ip: "192.168.1.20"  # Storage + general-purpose worker
+    pihole_ip: "192.168.1.30"          # Pi-hole on controller or separate
+    loadbalancer_ip: "192.168.1.5"     # Load balancer (can be on any node)
+    
+    # === LOAD BALANCER CONFIGURATION ===
+    lb_port: 53                    # DNS port for Pi-hole integration
+    lb_https_port: 443            # HTTPS termination
+    
+    # === RESOURCE LIMITS (adjust based on your Pi model) ===
+    memory_limit_mb: 512          # Default for Pi 3/4
+    cpu_cores: 4                  # Auto-detected, can be overridden
+    max_concurrent_jobs: 2        # Limit concurrent jobs per worker
+
+  roles:
+    # Apply common configuration to ALL nodes first
+    - role: common
+    
+    # Role-specific configurations based on host type
+    - role: controller
+      when: inventory_hostname in groups['controller']
+    
+    - role: worker
+      when: inventory_hostname in groups['workers']
+    
+    - role: storage-controller
+      when: inventory_hostname in groups['storage']
+
+  post_tasks:
+    - name: Verify cluster connectivity
+      ansible.builtin.ping:
+        host: "{{ item }}"
+      loop: "{{ groups['all'] | default([]) }}"
+      register: ping_results
+      failed_when: false
+
+    - name: Print deployment summary
+      debug:
+        msg: |
+          ========================================
+           CLUSTER DEPLOYMENT COMPLETE (4 Nodes)
+          ========================================
+          
+          Controller: {{ groups['controller'][0] | default('N/A') }}
+                    Role: Monitoring Hub + Orchestration
+          Workers:   {{ groups['workers'] | join(', ') | default('None') }}
+                    Role: Pure Compute Jobs
+          Storage:  {{ groups['storage'][0] | default('N/A') }}
+                    Role: Shared Storage + General-Purpose Worker
+          
+          Network:
+            - Controller IP: {{ controller_ip }}
+            - Storage IP:    {{ storage_controller_ip }}
+            - Pi-hole IP:   {{ pihole_ip }}
+            - Load Balancer:{{ loadbalancer_ip }}
+          ========================================

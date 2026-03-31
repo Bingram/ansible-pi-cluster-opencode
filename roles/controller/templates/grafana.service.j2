@@ -1,0 +1,18 @@
+# Grafana systemd service
+[Unit]
+Description=Grafana Visualization Dashboard
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/monitoring/grafana
+ExecStart=/opt/monitoring/grafana/grafana server \
+  --config=/etc/grafana/grafana.ini \
+  --pidfile=/var/run/grafana.pid
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
