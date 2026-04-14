@@ -33,9 +33,9 @@
     pihole_logging_level: "info"
     
     # Controller and storage IPs for reference
-    controller_ip: "192.168.1.10"
-    storage_controller_ip: "192.168.1.20"
-    loadbalancer_ip: "192.168.1.5"
+    controller_ip: "rk01.local"
+    storage_controller_ip: "rk01.local"
+    loadbalancer_ip: "rpi02.local"
 
   tasks:
     # Install prerequisites
@@ -210,7 +210,7 @@ EOF
               
               # Get basic statistics if available
               STATS=$(curl -s --connect-timeout 2 "http://$PIHOLE_IP:$WEB_PORT/admin/api.php?summaryRaw" 2>/dev/null)
-              if [ $? -eq 0 ]; then
+              if [ $? == 0 ]; then
                   echo ""
                   echo "=== Basic Statistics ==="
                   echo "$STATS"

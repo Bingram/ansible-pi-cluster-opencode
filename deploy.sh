@@ -152,10 +152,10 @@ validate_inventory() {
         done
         print_info "You can add these defaults to inventory.ini:
 cluster_name='Raspberry-Pi-Cluster'
-controller_ip=192.168.1.10
-storage_controller_ip=192.168.1.20
-pihole_ip=192.168.1.30
-loadbalancer_ip=192.168.1.5"
+controller_ip=rk01.local
+storage_controller_ip=rk01.local
+pihole_ip=rpi02.local
+loadbalancer_ip=rpi02.local"
     fi
     
     print_success "Inventory validation passed"
@@ -232,7 +232,7 @@ replay_deployment() {
 main() {
     parse_arguments "$@"
     
-    if [[ $HELP_REQUEST -eq true ]]; then
+    if [[ $HELP_REQUEST == true ]]; then
         show_help
     fi
     
@@ -247,7 +247,7 @@ main() {
     print_info "Starting deployment..."
     echo ""
     
-    if [[ $REPLAY -eq true ]]; then
+    if [[ $REPLAY == true ]]; then
         replay_deployment
     else
         deploy_all_roles

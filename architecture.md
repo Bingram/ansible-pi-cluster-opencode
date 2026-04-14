@@ -54,11 +54,11 @@
 
 | Role | IP Address | Primary Function |
 |------|------------|------------------|
-| **Controller** | 192.168.1.10 | Monitoring hub, orchestration, DNS load balancer |
-| **Storage Controller** | 192.168.1.20 | NFS server, shared storage management |
-| **Worker-1** | 192.168.1.30 | Job processing + Pi-hole integration |
-| **Worker-2** | 192.168.1.31 | Pure compute job processing |
-| **Worker-3** | 192.168.1.32 | Pure compute job processing |
+| **Controller** | rk01.local | Monitoring hub, orchestration, DNS load balancer |
+| **Storage Controller** | rk01.local | NFS server, shared storage management |
+| **Worker-1** | rpi02.local | Job processing + Pi-hole integration |
+| **Worker-2** | rpi03.local | Pure compute job processing |
+| **Worker-3** | rpi04.local | Pure compute job processing |
 
 ### Service Ports Reference
 
@@ -152,10 +152,10 @@ nano inventory.ini
 systemctl list-units --all | grep -E "prometheus|grafana|redis|bind9"
 
 # Test DNS resolution
-dig @192.168.1.5 cluster.local
+dig @rpi02.local cluster.local
 
 # View Grafana dashboard
-open http://192.168.1.10:3000  # Default credentials: admin/admin
+open http://rk01.local:3000  # Default credentials: admin/admin
 ```
 
 ## 📊 Monitoring & Maintenance
@@ -225,10 +225,10 @@ sudo systemctl restart redis-server
 ### Inventory Variables (inventory.ini)
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `controller_ip` | 192.168.1.10 | Monitoring hub address |
-| `storage_controller_ip` | 192.168.1.20 | NFS server address |
-| `pihole_ip` | 192.168.1.30 | Pi-hole DNS server |
-| `loadbalancer_ip` | 192.168.1.5 | Front-end DNS load balancer |
+| `controller_ip` | rk01.local | Monitoring hub address |
+| `storage_controller_ip` | rk01.local | NFS server address |
+| `pihole_ip` | rpi02.local | Pi-hole DNS server |
+| `loadbalancer_ip` | rpi02.local | Front-end DNS load balancer |
 
 ### Role-Specific Variables
 

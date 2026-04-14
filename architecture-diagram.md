@@ -14,7 +14,7 @@
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    LOAD BALANCER (192.168.1.5)                       │
+│                    LOAD BALANCER (rpi02.local)                       │
 │  ┌───────────────────────────────────────────────────────────────┐   │
 │  │  BIND9 DNS Server                                             │   │
 │  │  ├─ Primary Zone: cluster.local                               │   │
@@ -32,8 +32,8 @@
     ▼                         ▼                         ▼
 ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
 │   CONTROLLER    │  │ STORAGE         │  │   WORKER-1      │
-│   (192.168.1.10)│  │   SERVER        │  │   (192.168.1.30)│
-│                  │  │   (192.168.1.20)│  │                  │
+│   (rk01.local)│  │   SERVER        │  │   (rpi02.local)│
+│                  │  │   (rk01.local)│  │                  │
 ├─────────────────┤  ├─────────────────┤  ├─────────────────┤
 │ ┌───────────────┤  │ ┌───────────────┤  │ ┌───────────────┤
 │ │ Monitoring Hub│  │ │ NFS Server    │  │ │ Job Processor  │
@@ -51,7 +51,7 @@
     ▼                 ▼                     ▼
 ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
 │   WORKER-2      │  │   WORKER-3      │  │   REDIS         │
-│   (192.168.1.31)│  │   (192.168.1.32)│  │   QUEUE         │
+│   (rpi03.local)│  │   (rpi04.local)│  │   QUEUE         │
 ├─────────────────┤  ├─────────────────┤  │                  │
 │ ┌───────────────┤  │ ┌───────────────┤  │ ┌───────────────┤
 │ │ Job Processor │  │ │ Job Processor │  │ │ Celery Worker  │
@@ -275,9 +275,13 @@ tar -czf cluster-backup-$(date +%Y%m%d).tar.gz \
     /etc/bind/ /etc/nfs/ /opt/monitoring/
 
 # Reboot all nodes
-for ip in 192.168.1.{5,10,20,30,31,32}; do
+# for ip in 192.168.1.{5,10,20,30,31,32}; do
+#     ssh root@$ip "sudo reboot"
+# done
+for name in rpi0{02,03,04}.local; do
     ssh root@$ip "sudo reboot"
 done
+ssh root@rk01.local "sudo reboot"
 ```
 
 ### Disaster Recovery

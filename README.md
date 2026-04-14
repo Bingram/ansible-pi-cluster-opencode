@@ -87,10 +87,10 @@ ansible-pi-cluster-opencode/
 ```ini
 [all:vars]
 cluster_name="Raspberry-Pi-Cluster"
-controller_ip=192.168.1.10
-storage_controller_ip=192.168.1.20
-pihole_ip=192.168.1.30
-loadbalancer_ip=192.168.1.5
+controller_ip=rk01.local
+storage_controller_ip=rk01.local
+pihole_ip=rpi02.local
+loadbalancer_ip=rpi02.local
 ```
 
 ### Role-Specific Variables

@@ -9,10 +9,10 @@
   vars:
     # Network configuration
     cluster_name: "Raspberry-Pi-Cluster"
-    controller_ip: "192.168.1.10"
-    storage_controller_ip: "192.168.1.20"
-    pihole_ip: "192.168.1.30"
-    loadbalancer_ip: "192.168.1.5"
+    controller_ip: "rk01.local"
+    storage_controller_ip: "rk01.local"
+    pihole_ip: "rpi02.local"
+    loadbalancer_ip: "rpi02.local"
     
     # DNS configuration
     dns_port: 53
@@ -126,7 +126,7 @@
               echo "CPU Load: $CPU_LOAD"
               echo "Memory Usage: ${MEM_USAGE}%"
               
-              if [ $(echo "$CPU_LOAD > 5" | bc -l) -eq 1 ]; then
+              if [ $(echo "$CPU_LOAD > 5" | bc -l) == 1 ]; then
                   echo "[WARN] High CPU load detected!"
               fi
               

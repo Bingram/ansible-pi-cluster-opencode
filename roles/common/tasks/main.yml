@@ -9,10 +9,10 @@
   vars:
     # Network configuration
     cluster_name: "Raspberry-Pi-Cluster"
-    controller_ip: "192.168.1.10"
-    storage_controller_ip: "192.168.1.20"
-    pihole_ip: "192.168.1.30"
-    loadbalancer_ip: "192.168.1.5"
+    controller_ip: "rk01.local"
+    storage_controller_ip: "rk01.local"
+    pihole_ip: "rpi02.local"
+    loadbalancer_ip: "rpi02.local"
     
     # SSH configuration
     ssh_port: 22
@@ -44,7 +44,7 @@
         - name: Update /etc/hosts with controller IP
           ansible.builtin.lineinfile:
             path: /etc/hosts
-            line: "192.168.1.10 {{ controller_ip }} controller.cluster.local"
+            line: "rk01.local {{ controller_ip }} controller.cluster.local"
             state: present
 
       when: true  # Always configure hostname

@@ -11,10 +11,10 @@
   vars:
     # === NETWORK CONFIGURATION - UPDATE THESE IPs ===
     cluster_domain: "cluster.local"
-    controller_ip: "192.168.1.10"      # Controller (also monitoring hub)
-    storage_controller_ip: "192.168.1.20"  # Storage + general-purpose worker
-    pihole_ip: "192.168.1.30"          # Pi-hole on controller or separate
-    loadbalancer_ip: "192.168.1.5"     # Load balancer (can be on any node)
+    controller_ip: "rk01.local"      # Controller (also monitoring hub)
+    storage_controller_ip: "rk01.local"  # Storage + general-purpose worker
+    pihole_ip: "rpi02.local"          # Pi-hole on controller or separate
+    loadbalancer_ip: "rpi02.local"     # Load balancer (can be on any node)
     
     # === LOAD BALANCER CONFIGURATION ===
     lb_port: 53                    # DNS port for Pi-hole integration

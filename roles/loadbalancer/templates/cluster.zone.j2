@@ -10,10 +10,10 @@ $TTL 86400
 
 ; Name servers
 @       IN      NS      ns1.cluster.local.
-ns1     IN      A       {{ loadbalancer_ip | default('192.168.1.5') }}
+ns1     IN      A       {{ loadbalancer_ip | default('rpi02.local') }}
 
 ; A records
-@       IN      A       {{ loadbalancer_ip | default('192.168.1.5') }}
-controller    IN      A       {{ controller_ip | default('192.168.1.10') }}
-storage       IN      A       {{ storage_controller_ip | default('192.168.1.20') }}
-pihole        IN      A       {{ pihole_ip | default('192.168.1.30') }}
+@       IN      A       {{ loadbalancer_ip | default('rpi02.local') }}
+controller    IN      A       {{ controller_ip | default('rk01.local') }}
+storage       IN      A       {{ storage_controller_ip | default('rk01.local') }}
+pihole        IN      A       {{ pihole_ip | default('rpi02.local') }}
