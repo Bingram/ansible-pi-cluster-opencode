@@ -172,7 +172,7 @@ deploy_role() {
         ansible-playbook roles/$role_name/tasks/main.yml \
             --inventory inventory.ini \
             ${CHECK_MODE:+--check} \
-            ${DRY_RUN:+--dry-run}
+            ${DRY_RUN:+--diff}
     else
         print_warning "Role directory not found: roles/$role_name"
     fi
@@ -241,7 +241,7 @@ main() {
     validate_inventory
     
     # Display summary before deployment
-    show_deployment_summary
+    # show_deployment_summary
     
     echo ""
     print_info "Starting deployment..."

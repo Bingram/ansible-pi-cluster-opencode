@@ -1,0 +1,33 @@
+# Cluster SSH Configuration
+# ==============================================
+# Managed by Ansible - Do not edit manually
+
+# Disable password authentication
+PasswordAuthentication {{ ssh_password_auth | default(false) }}
+
+# Only allow key-based authentication
+PubkeyAuthentication yes
+
+# PermitRootLogin configuration  
+PermitRootLogin {{ ssh_permit_root_login | default('no') }}
+
+# Set banner for legal notice if configured
+Banner /etc/issue.net
+
+# Allow TCP forwarding (needed for cluster communication)
+AllowTcpForwarding yes
+
+# Disable X11 forwarding for security
+X11Forwarding no
+
+# MaxAuthTries configuration
+MaxAuthTries 3
+
+# MaxSessions per connection
+MaxSessions 10
+
+# ClientAliveInterval - idle timeout
+ClientAliveInterval 300
+
+# ClientAliveCountMax - how many times to resend keepalives
+ClientAliveCountMax 2

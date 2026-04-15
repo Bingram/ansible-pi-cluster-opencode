@@ -12,7 +12,7 @@
     controller_ip: "rk01.local"
     storage_controller_ip: "rk01.local"
     pihole_ip: "rpi02.local"
-    loadbalancer_ip: "rpi02.local"
+    loadbalancer_ip: "rpi03.local"
     
     # SSH configuration
     ssh_port: 22
@@ -22,10 +22,6 @@
     # Firewall settings
     ufw_default_policy: deny
     ufw_ssh_allowed: true
-    
-    # System settings
-    hostname_suffix: "{{ ansible_hostname }}"
-    timezone: "Europe/London"  # Adjust for your location
 
   tasks:
     # Set hostname and update /etc/hosts
@@ -38,8 +34,8 @@
 
         - name: Set new hostname if different
           ansible.builtin.hostname:
-            name: "{{ cluster_name }}-{{ hostname_suffix }}"
-          when: current_hostname.stdout != cluster_name + '-' + hostname_suffix
+            name: "{{ cluster_name }}-{{ hostname_suffix | default(ansible_hostname) }}"
+          when: current_hostname.stdout != cluster_name + '-' + (hostname_suffix | default(ansible_hostname))
 
         - name: Update /etc/hosts with controller IP
           ansible.builtin.lineinfile:
@@ -78,7 +74,7 @@
             name: ufw
             state: present
 
-        - name: Set default policies
+        - name: Set default policies (must be done before allowing rules)
           community.general.ufw:
             default_policy: "{{ ufw_default_policy }}"
             logging_on: true
@@ -87,7 +83,7 @@
           community.general.ufw:
             rule: allow
             port: "{{ ssh_port }}/tcp"
-            description: "SSH access"
+            comment: "SSH access"
 
       when: true  # Always configure firewall
 
@@ -101,7 +97,7 @@
             mode: '0755'
 
         - name: Download Node Exporter binary
-          ansible.builtin.geturl:
+          ansible.builtin.get_url:
             url: "https://github.com/prometheus/node_exporter/releases/download/v1.6.1/node_exporter-{{ ansible_system | lower }}_v1.6.1.tar.gz"
             dest: /opt/monitoring/node_exporter/node_exporter.tar.gz
           register: node_exporter_download
@@ -139,12 +135,5 @@
             state: directory
             mode: '0755'
 
-        - name: Set up rsyslog for cluster logging
-          community.general.rsyslog:
-            config: |
-              # Forward all logs to controller
-              *.* @{{ controller_ip }}
-            dest: /etc/rsyslog.d/cluster.conf
-            state: present
-
       when: true  # Configure logging by default
+

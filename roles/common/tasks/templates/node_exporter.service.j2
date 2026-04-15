@@ -1,0 +1,12 @@
+[Unit]
+Description=Node Exporter for Prometheus
+After=network.target remote-fs.target
+
+[Service]
+Type=simple
+ExecStart=/opt/monitoring/node_exporter/node_exporter --web.listen-address=:9100
+Restart=on-failure
+User=root
+
+[Install]
+WantedBy=multi-user.target

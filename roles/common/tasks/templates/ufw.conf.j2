@@ -1,0 +1,11 @@
+# Cluster Firewall Configuration (UFW)
+# =======================================
+
+# Default policy for new connections after firewall is active
+DEFAULT deny incoming
+
+# Allow SSH (port 22 or {{ssh_port}}) to the host
+allow {ssh_port || 22}/tcp from any to any
+
+# Allow ICMP requests
+log logging on
