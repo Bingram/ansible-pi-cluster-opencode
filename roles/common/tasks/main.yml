@@ -78,12 +78,14 @@
           community.general.ufw:
             default_policy: "{{ ufw_default_policy }}"
             logging_on: true
+            state: enabled
 
         - name: Allow SSH through firewall
           community.general.ufw:
             rule: allow
             port: "{{ ssh_port }}/tcp"
             comment: "SSH access"
+            state: enabled
 
       when: true  # Always configure firewall
 
