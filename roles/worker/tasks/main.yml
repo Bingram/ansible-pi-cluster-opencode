@@ -46,22 +46,24 @@
         name: redis-server
         enabled: yes
         state: started
+        daemon_reload: yes
+        failed_when: false
 
     # Install Python dependencies for job processing
     - name: Create virtual environment for job processing
-      ansible.builtin.venv:
-        path: /opt/job-processing-env
-        interpreter: python3
+      ansible.builtin.command:
+        cmd: python3 -m venv /opt/job-processing-env
+        creates: /opt/job-processing-env/bin/activate
 
     - name: Install job processing dependencies
       ansible.builtin.pip:
+        name:
+          - celery>=5.2.0
+          - redis>=4.3.0
+          - kombu>=5.2.0
+          - flower>=1.0.0
         virtualenv: /opt/job-processing-env
-        requirements: |
-          celery>=5.2.0
-          redis>=4.3.0
-          kombu>=5.2.0
-          flower>=1.0.0  # Web-based Celery monitoring
-        executable: /opt/job-processing-env/bin/pip
+        executable: python3
 
     # Set up Celery worker configuration
     - name: Create Celery worker directory structure

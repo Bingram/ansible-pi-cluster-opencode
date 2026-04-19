@@ -1,0 +1,14 @@
+[Unit]
+Description=Health Monitor for DNS Load Balancer
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/opt/dns/health/check_health.sh
+Restart=always
+RestartSec=5
+User=root
+Group=root
+
+[Install]
+WantedBy=multi-user.target

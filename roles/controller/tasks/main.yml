@@ -38,7 +38,7 @@
     # Set up Prometheus repository and install
     - name: Add Prometheus GPG key
       ansible.builtin.apt_key:
-        url: https://packages.redis.io/redis-oss.gpg.key
+        url: https://apt.grafana.com/gpg.key
         state: present
 
     - name: Install Prometheus from official repository
@@ -54,7 +54,7 @@
         mode: '0755'
 
     - name: Download and install Node Exporter binary
-      ansible.builtin.geturl:
+      ansible.builtin.get_url:
         url: "https://github.com/prometheus/node_exporter/releases/download/v1.6.1/node_exporter-{{ ansible_system | lower }}_v1.6.1.tar.gz"
         dest: /opt/monitoring/node_exporter/node_exporter.tar.gz
       register: node_exporter_download
@@ -88,7 +88,7 @@
         mode: '0755'
 
     - name: Download and install Blackbox Exporter binary
-      ansible.builtin.geturl:
+      ansible.builtin.get_url:
         url: "https://github.com/prometheus/blackbox_exporter/releases/download/v0.21.0/blackbox_exporter-{{ ansible_system | lower }}_v0.21.0.tar.gz"
         dest: /opt/monitoring/blackbox_exporter/blackbox_exporter.tar.gz
       register: blackbox_download

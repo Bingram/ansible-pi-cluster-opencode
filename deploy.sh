@@ -171,7 +171,6 @@ deploy_role() {
         # Run the role deployment
         ansible-playbook roles/$role_name/tasks/main.yml \
             --inventory inventory.ini \
-            ${CHECK_MODE:+--check} \
             ${DRY_RUN:+--diff}
     else
         print_warning "Role directory not found: roles/$role_name"

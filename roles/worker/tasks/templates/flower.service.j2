@@ -1,0 +1,17 @@
+[Unit]
+Description=Flower Monitoring Service for Celery Workers
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/opt/job-processing-env/bin/flower \
+    --port=5555 \
+    --broker=redis://:{{ redis_password | default('cluster_queue') }}@{{ controller_ip | default('rk01.local') }}:{{ redis_port | default(6379) }} \
+    --access-token={{ flower_access_token | default('celery') }}
+Restart=always
+RestartSec=5
+User=root
+Group=root
+
+[Install]
+WantedBy=multi-user.target

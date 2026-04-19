@@ -8,10 +8,10 @@
     controller_ip: "rk01.local"
     
   tasks:
-    # Set hostname  
+    # Set hostname
     - name: Set static hostname
       ansible.builtin.hostname:
-        name: "{{ cluster_name }}-{{ ansible_hostname }}"
+        name: "{{ cluster_name[:20] }}-{{ ansible_hostname[:8] }}"
 
     # Install monitoring agent
     - name: Create Node Exporter directory
@@ -22,8 +22,9 @@
 
     - name: Download Node Exporter binary
       ansible.builtin.get_url:
-        url: "https://github.com/prometheus/node_exporter/releases/download/v1.6.1/node_exporter-{{ ansible_system | lower }}_v1.6.1.tar.gz"
-        dest: /opt/monitoring/node_exporter/node_exporter.tar.gz
+        url: "https://github.com/prometheus/node_exporter/releases/download/v1.6.1/node_exporter-1.6.1.linux-amd64.tar.gz"
+        dest: "/opt/monitoring/node_exporter/node_exporter.tar.gz"
+        mode: '0644'
 
     - name: Extract Node Exporter binary
       ansible.builtin.unarchive:
@@ -33,16 +34,15 @@
 
     - name: Create Node Exporter systemd service
       ansible.builtin.copy:
-        content: |[
+        content: |
           [Unit]
           Description=Node Exporter for Prometheus
-          
+
           [Service]
           ExecStart=/opt/monitoring/node_exporter/node_exporter --web.listen-address=:9100
-          
+
           [Install]
           WantedBy=multi-user.target
-        ]
         dest: /etc/systemd/system/node_exporter.service
         mode: '0644'
 

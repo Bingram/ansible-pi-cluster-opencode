@@ -61,7 +61,7 @@
 
     # Install Pi-hole using official installer script
     - name: Download and run Pi-hole installer
-      ansible.builtin.geturl:
+      ansible.builtin.get_url:
         url: "https://install.pi-hole.net"
         dest: /tmp/pihole-installer.sh
         owner: root

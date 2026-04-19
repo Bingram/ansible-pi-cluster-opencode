@@ -1,0 +1,23 @@
+[Unit]
+Description=Celery Worker Service
+After=network.target redis.service
+
+[Service]
+Type=simple
+ExecStart=/opt/job-processing-env/bin/celery \
+    -A tasks:app worker \
+    -c {{ celery_worker_concurrency | default(4) }} \
+    --loglevel={{ celery_worker_loglevel | default('info') }} \
+    --concurrency={{ celery_worker_concurrency | default(4) }} \
+    --prefetch-multiplier={{ celery_worker_prefetch_multiplier | default(1) }} \
+    --max-tasks-per-child=1000 \
+    --pool={{ celery_worker_pool | default('prefork') }} \
+    --task-timeout={{ job_timeout | default(3600) }} \
+    --broker=redis://:{{ redis_password | default('cluster_queue') }}@{{ controller_ip | default('rk01.local') }}:{{ redis_port | default(6379) }}/0
+Restart=always
+RestartSec=5
+User=root
+Group=root
+
+[Install]
+WantedBy=multi-user.target

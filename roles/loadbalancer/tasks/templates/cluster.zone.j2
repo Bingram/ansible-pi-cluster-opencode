@@ -1,0 +1,27 @@
+$TTL 3600
+@       IN      SOA     @.  (
+    admin.cluster.local.    ; RName of the ZONEMaster
+    1                        ; Serial
+    3600                     ; Refresh
+    600                      ; Retry
+    86400                    ; Expire
+    86400                    ; Minimum TTL
+)
+
+@       IN      NS      @.
+@       IN      NS      @.
+
+; A Records
+@       IN      A       {{ loadbalancer_ip | default('192.168.1.1') }}
+
+; MX Records
+@       IN      MX      10  @.
+
+; TXT Record
+@       IN      TXT     "v=spf1 -all"
+
+; CNAME Records
+www     IN      CNAME   @.
+
+; SPF Record for email
+@       IN      TXT     "v=spf1 -all"
